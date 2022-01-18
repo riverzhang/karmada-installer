@@ -1,0 +1,20 @@
+---
+- name: Create Karmada agent directory
+  file: name=/etc/kubernetes/addons/karmada/scheduler state=directory
+
+- name: Create karmada apiserver config by secret
+  shell: "{{ bin_dir }}/kubectl create secret generic {{ current_member_cluster_name }}-kubeconfig --from-file={{ current_member_cluster_name }}-kubeconfig=/root/.kube/config -n karmada-system --kubeconfig /etc/karmada/config"  # noqa 301 306 303 305
+  ignore_errors: true
+
+- name: Lay down Karmada scheduler estimator
+  template:
+    src: "{{ item.file }}"
+    dest: "{{ kube_config_dir }}/addons/karmada/scheduler/{{ item.file }}"
+  with_items:
+    - { name: karmada-estimator, file: karmada-scheduler-estimator.yaml, type: deployment }
+  register: karmada_manifests
+
+- name: Start karmada scheduler estimator
+  shell: "{{ bin_dir }}/kubectl apply -f /etc/kubernetes/addons/karmada/scheduler/{{ item.item.file }} --kubeconfig /etc/karmada/config"  # noqa 301 306 303 305
+  ignore_errors: true
+  with_items: "{{ karmada_manifests.results }}"

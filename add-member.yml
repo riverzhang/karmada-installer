@@ -1,0 +1,4 @@
+---
+- hosts: add-member
+  roles:
+    - { role: karmada-member }

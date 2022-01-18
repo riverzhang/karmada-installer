@@ -1,0 +1,2 @@
+---
+KUBERNETES_SERVICE_IP: "{{ kube_service_subnet | ipaddr('net') | ipaddr(1) | ipaddr('address') }}"

@@ -1,0 +1,10 @@
+---
+- name: Uninstall karmamda of member cluster
+  shell: "cat /etc/kubernetes/addons/karmada/agent/* | {{ bin_dir }}/kubectl delete -f -"  # noqa 301 306 303 305
+  ignore_errors: true
+
+- name: Remove files and dirs of 'karmada' nodes
+  file: name={{ item }} state=absent
+  with_items:
+    - "/etc/karmada/"
+    - "/etc/kubernetes/addons/karmada/"

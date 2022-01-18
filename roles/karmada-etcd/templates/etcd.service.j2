@@ -1,0 +1,39 @@
+[Unit]
+Description=Etcd Server
+After=network.target
+After=network-online.target
+Wants=network-online.target
+Documentation=https://github.com/coreos
+
+[Service]
+Type=notify
+WorkingDirectory={{ karmada_etcd_data_dir }}/
+ExecStart={{ bin_dir }}/karmada-etcd \
+  --name={{ etcd_member_name }} \
+  --cert-file=/etc/karmada/pki/etcd/server.crt \
+  --key-file=/etc/karmada/pki/etcd/server.key \
+  --peer-cert-file=/etc/karmada/pki/etcd/peer.crt \
+  --peer-key-file=/etc/karmada/pki/etcd/peer.key \
+  --trusted-ca-file=/etc/karmada/pki/etcd/ca.crt \
+  --peer-trusted-ca-file=/etc/karmada/pki/etcd/ca.crt \
+  --initial-advertise-peer-urls=https://{{ current_host_ip }}:2382 \
+  --listen-peer-urls=https://{{ current_host_ip }}:2382 \
+  --listen-client-urls=https://{{ current_host_ip }}:2381,http://127.0.0.1:2381 \
+  --advertise-client-urls=https://{{ current_host_ip }}:2381 \
+  --initial-cluster-token={{ etcd_cluster_token }} \
+  --initial-cluster={{ karmada_etcd_nodes }} \
+  --logger=zap \
+  --heartbeat-interval=300 \
+  --election-timeout=3000 \
+  --snapshot-count=5000 \
+  --auto-compaction-retention=1 \
+  --initial-cluster-state=new \
+  --data-dir={{ karmada_etcd_data_dir }} \
+  --max-request-bytes=10485760 \
+  --quota-backend-bytes=8589934592
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target
