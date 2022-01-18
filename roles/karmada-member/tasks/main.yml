@@ -1,0 +1,18 @@
+---
+# rename context
+- include_tasks: kubeconfig.yml
+
+# push mode install
+- block:
+    - include_tasks: join-clusters.yml
+  when: 'current_sync_mode == "push"'
+
+# pull mode install
+- block:
+    - include_tasks: karmada-agent.yml
+  when: 'current_sync_mode == "pull"'
+
+# install scheduler estimator
+- block:
+    - include_tasks: install-estimator.yml
+  when: scheduler_estimator_enabled

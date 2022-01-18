@@ -1,0 +1,4 @@
+---
+- hosts: del-member
+  roles:
+    - { role: karmada-member-delete }

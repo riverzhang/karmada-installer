@@ -1,0 +1,33 @@
+---
+# karmada version, support v0.10.1 and v1.0.0
+karmada_version: "v1.0.0"
+etcd_version: "v3.4.12"
+kube_version: "v1.21.7"
+
+# download dir
+local_release_dir: "/tmp/karmada"
+download_timeout_online: "3600"
+
+bin_dir: "/usr/local/bin"
+kube_config_dir: "/etc/kubernetes"
+
+# kubectl karmada plugin donwload file
+architectures: "amd64"
+karmadactl_download_url: "https://github.com/karmada-io/karmada/releases/download/{{ karmada_version }}/kubectl-karmada-linux-{{ architectures }}.tgz"
+etcd_download_url: "https://github.com/etcd-io/etcd/releases/download/{{ etcd_version }}/etcd-{{ etcd_version }}-linux-{{ architectures }}.tar.gz"
+
+# external etcd configure
+etcd_certs_expired: "36500"
+karmada_etcd_nodes: "{% for host in (groups['karmada-etcd']|unique) %}{% if hostvars[host]['ansible_ssh_host'] is defined %}{{ hostvars[host]['etcd_member_name'] }}=https://{{ hostvars[host]['ansible_ssh_host'] }}:2382{% else %}etcd-{{ host }}=https://{{ host }}:2382{% endif %}{% if not loop.last %},{% endif %}{% endfor %}"
+karmada_etcd_endpoints: "{% for host in (groups['karmada-etcd']|unique) %}{% if hostvars[host]['ansible_ssh_host'] is defined %}https://{{ hostvars[host]['ansible_ssh_host'] }}:2381{% else %}https://{{ host }}:2381{% endif %}{% if not loop.last %},{% endif %}{% endfor %}"
+karmada_etcd_cert_dir: "/etc/karmada/pki/etcd"
+karmada_etcd_data_dir: "/var/lib/karmada/etcd"
+
+# karmada configure
+kube_service_subnet: "10.96.0.0/12"
+kube_dns_domain: "{{ cluster_name }}"
+cluster_name: "cluster.karmada-apiserver"
+certs_expired: "{{ etcd_certs_expired }}"
+lb_karmada_apiserver_port: "5443"
+lb_karmada_apiserver_ip: "192.168.1.1"
+scheduler_estimator_enabled: true

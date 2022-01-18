@@ -1,0 +1,9 @@
+---
+
+# current host ip
+current_host_ip: "{% if hostvars[inventory_hostname]['ansible_ssh_host'] is defined %}{{ hostvars[inventory_hostname]['ansible_ssh_host'] }}{% else %}{{ inventory_hostname }}{% endif %}"
+
+# etcd endpoints
+etcd_nodes: "{% for host in (groups['karmada-etcd']|unique) %}{% if hostvars[host]['ansible_ssh_host'] is defined %}{{ hostvars[host]['etcd_member_name'] }}=https://{{ hostvars[host]['ansible_ssh_host'] }}:2382{% else %}etcd-{{ host }}=https://{{ host }}:2382{% endif %}{% if not loop.last %},{% endif %}{% endfor %}"
+
+apiserver_replicas: "{{ groups['karmada-controlplane']|length }}"

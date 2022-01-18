@@ -1,0 +1,13 @@
+---
+# rename context
+- include_tasks: config.yml
+
+# push mode uninstall
+- block:
+    - include_tasks: unjoin-clusters.yml
+  when: 'current_sync_mode == "push"'
+
+# pull mode uninstall
+- block:
+    - include_tasks: karmada-agent.yml
+  when: 'current_sync_mode == "pull"'

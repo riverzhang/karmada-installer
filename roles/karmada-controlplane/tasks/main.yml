@@ -1,0 +1,201 @@
+---
+- name: Create karmada admin.conf file
+  shell: >
+    {{ bin_dir }}/kubectl config set-cluster karmada-apiserver
+    --certificate-authority=/etc/karmada/pki/ca.crt
+    --embed-certs=true
+    --server=https://{{ lb_karmada_apiserver_ip | trim }}:{{ lb_karmada_apiserver_port | trim }}
+    --kubeconfig=/etc/karmada/admin.conf &&
+    {{ bin_dir }}/kubectl config set-credentials karmada-apiserver
+    --client-certificate=/etc/karmada/pki/admin.crt
+    --client-key=/etc/karmada/pki/admin.key
+    --embed-certs=true
+    --kubeconfig=/etc/karmada/admin.conf &&
+    {{ bin_dir }}/kubectl config set-context karmada-apiserver
+    --cluster=karmada-apiserver
+    --user=karmada-apiserver
+    --kubeconfig=/etc/karmada/admin.conf &&
+    {{ bin_dir }}/kubectl config use-context
+    karmada-apiserver
+    --kubeconfig=/etc/karmada/admin.conf
+
+- name: Master node copy host kubeconfig file
+  copy:
+    src: /root/.kube/config
+    dest: "/etc/karmada/config"
+    mode: 0600
+    remote_src: yes
+
+- name: Creates a new context including a cluster and a user to the existed kubeconfig file
+  shell: >
+    {{ bin_dir }}/kubectl config set-cluster karmada-apiserver
+    --certificate-authority=/etc/karmada/pki/ca.crt
+    --embed-certs=true
+    --server=https://{{ lb_karmada_apiserver_ip | trim }}:{{ lb_karmada_apiserver_port | trim }}
+    --kubeconfig=/root/.kube/config &&
+    {{ bin_dir }}/kubectl config set-credentials karmada-apiserver
+    --client-certificate=/etc/karmada/pki/admin.crt
+    --client-key=/etc/karmada/pki/admin.key
+    --embed-certs=true
+    --kubeconfig=/root/.kube/config &&
+    {{ bin_dir }}/kubectl config set-context karmada-apiserver
+    --cluster=karmada-apiserver
+    --user=karmada-apiserver
+    --kubeconfig=/root/.kube/config
+
+- name: Master node copy karmada kubeconfig file
+  copy:
+    src: /etc/karmada/admin.conf
+    dest: "/etc/karmada/kubeconfig"
+    mode: 0600
+    remote_src: yes
+
+- name: Create Karmada controlplane directory
+  file: name=/etc/kubernetes/addons/karmada/controlplane state=directory
+
+- name: Addons | Create service account, cluster role for controller-manager
+  template:
+    src: "{{ item.file }}"
+    dest: "{{ kube_config_dir }}/addons/karmada/controlplane/{{ item.file }}"
+  with_items:
+    - { name: karmada-controlplane, file: namespace.yaml, type: namespace }
+    - { name: karmada-controlplane, file: clusterrole.yaml, type: clusterrole }
+    - { name: karmada-controlplane, file: clusterrolebinding.yaml, type: clusterrolebinding }
+    - { name: karmada-controlplane, file: serviceaccount.yaml, type: sa }
+  register: karmada_rbac_manifests
+  when: inventory_hostname == groups['karmada-controlplane'][0]
+
+- name: Start sa, cluster role for controller-manager
+  shell: "{{ bin_dir }}/kubectl apply -f /etc/kubernetes/addons/karmada/controlplane/{{ item.item.file }}"  # noqa 301 306 303 305
+  ignore_errors: true
+  with_items: "{{ karmada_rbac_manifests.results }}"
+  when: inventory_hostname == groups['karmada-controlplane'][0]
+
+- name: Install karmada webhook certs
+  shell: cat /etc/karmada/pki/apiserver.crt | base64 | tr "\n" " "|sed s/[[:space:]]//g  # noqa 301 303 305 306
+  register: karmada_cert
+  when: inventory_hostname == groups['karmada-controlplane'][0]
+
+- name: Install karmada webhook certs
+  shell: cat /etc/karmada/pki/apiserver.key | base64 | tr "\n" " "|sed s/[[:space:]]//g  # noqa 301 303 305 306
+  register: karmada_key
+  when: inventory_hostname == groups['karmada-controlplane'][0]
+
+- name: Install karmada webhook certs
+  shell: cat /etc/karmada/pki/ca.crt | base64 | tr "\n" " "|sed s/[[:space:]]//g  # noqa 301 303 305 306
+  register: karmada_ca
+  when: inventory_hostname == groups['karmada-controlplane'][0]
+
+- name: Set secret vaule
+  set_fact:
+    server_key: "{{ karmada_key.stdout }}"
+    server_certificate: "{{ karmada_cert.stdout }}"
+    ca: "{{ karmada_ca.stdout }}"
+  when: inventory_hostname == groups['karmada-controlplane'][0]
+
+- name: Create karmada apiserver and  kube controller manager
+  template:
+    src: "{{ item.file }}"
+    dest: "{{ kube_config_dir }}/addons/karmada/controlplane/{{ item.file }}"
+  with_items:
+    - { name: karmada-controlplane, file: karmada-apiserver.yaml, type: deployment }
+    - { name: karmada-controlplane, file: kube-controller-manager.yaml, type: deployment }
+    - { name: karmada-controlplane, file: karmada-webhook-cert-secret.yaml, type: secret }
+  register: karmada_v0_manifests
+  when:
+    - inventory_hostname == groups['karmada-controlplane'][0]
+    - karmada_version is version('v0.10.1', '==')
+
+- name: Create karmada apiserver and  kube controller manager
+  template:
+    src: "{{ item.file }}"
+    dest: "{{ kube_config_dir }}/addons/karmada/controlplane/{{ item.file }}"
+  with_items:
+    - { name: karmada-controlplane, file: karmada-apiserver.yaml, type: deployment }
+    - { name: karmada-controlplane, file: kube-controller-manager.yaml, type: deployment }
+    - { name: karmada-controlplane, file: karmada-aggregated-apiserver.yaml, type: deployment }
+    - { name: karmada-controlplane, file: karmada-webhook-cert-secret.yaml, type: secret }
+  register: karmada_v1_manifests
+  when:
+    - inventory_hostname == groups['karmada-controlplane'][0]
+    - karmada_version is version('v1.0.0', '==')
+
+- name: Start karmada apiserver and  kube controller manager
+  shell: "{{ bin_dir }}/kubectl apply -f /etc/kubernetes/addons/karmada/controlplane/{{ item.item.file }}"  # noqa 301 306 303 305
+  ignore_errors: true
+  with_items: "{{ karmada_v1_manifests.results }}"
+  when:
+    - inventory_hostname == groups['karmada-controlplane'][0]
+    - karmada_version is version('v1.0.0', '==')
+
+- name: Start karmada apiserver and  kube controller manager
+  shell: "{{ bin_dir }}/kubectl apply -f /etc/kubernetes/addons/karmada/controlplane/{{ item.item.file }}"  # noqa 301 306 303 305
+  ignore_errors: true
+  with_items: "{{ karmada_v0_manifests.results }}"
+  when:
+    - inventory_hostname == groups['karmada-controlplane'][0]
+    - karmada_version is version('v0.10.1', '==')
+
+- name: Waiting for apiserver to running
+  uri:
+    url: "https://{{ current_host_ip }}:5443/healthz"
+    validate_certs: no
+  register: apiserver_result
+  until: apiserver_result.status == 200
+  retries: 60
+  delay: 5
+  when: inventory_hostname == groups['karmada-controlplane'][0]
+
+- name: Create namespace of karmada controlplane
+  shell: "{{ bin_dir }}/kubectl --kubeconfig=/etc/karmada/kubeconfig  apply -f /etc/kubernetes/addons/karmada/controlplane/namespace.yaml"  # noqa 301 306 303 305
+  ignore_errors: true
+  when: inventory_hostname == groups['karmada-controlplane'][0]
+
+- name: Copy crds
+  copy:
+    src: "{{ karmada_version }}_crds"
+    dest: "/etc/kubernetes/addons/karmada/controlplane"
+    mode: 0700
+  run_once: yes
+  when: inventory_hostname == groups['karmada-controlplane'][0]
+
+- name: Install karmada crds certs of webhook_in_clusterresourcebindings
+  shell: ca_string=$(cat /etc/karmada/pki/ca.crt | base64 | tr "\n" " "|sed s/[[:space:]]//g) && sed -i'' -e "s/k_caB/${ca_string}/g" "/etc/kubernetes/addons/karmada/controlplane/{{ karmada_version }}_crds/patches/webhook_in_clusterresourcebindings.yaml" && sed -i'' -e "s/k_caB/${ca_string}/g" "/etc/kubernetes/addons/karmada/controlplane/{{ karmada_version }}_crds/patches/webhook_in_resourcebindings.yaml"  # noqa 301 303 305 306
+  when: inventory_hostname == groups['karmada-controlplane'][0]
+
+- name: Install karmada crds
+  shell: "kubectl --kubeconfig=/etc/karmada/kubeconfig kustomize /etc/kubernetes/addons/karmada/controlplane/{{ karmada_version }}_crds | kubectl --kubeconfig=/etc/karmada/kubeconfig apply -f -"  # noqa 301 303 305 306
+  when: inventory_hostname == groups['karmada-controlplane'][0]
+
+- name: Create karmada apiserver and  kube controller manager
+  template:
+    src: "{{ item.file }}"
+    dest: "{{ kube_config_dir }}/addons/karmada/controlplane/{{ item.file }}"
+  with_items:
+    - { name: karmada-controlplane, file: apiservice.yaml, type: APIService }
+    - { name: karmada-controlplane, file: webhook-configuration.yaml, type: MutatingWebhookConfiguration }
+  register: karmada_manifests
+  when: inventory_hostname == groups['karmada-controlplane'][0]
+
+- name: Start karmada apiservice and webhook-configuration
+  shell: "{{ bin_dir }}/kubectl --kubeconfig=/etc/karmada/kubeconfig apply -f /etc/kubernetes/addons/karmada/controlplane/{{ item.item.file }}"  # noqa 301 306 303 305
+  ignore_errors: true
+  with_items: "{{ karmada_manifests.results }}"
+  when: inventory_hostname == groups['karmada-controlplane'][0]
+
+- name: Create karmada shceduler, webhook and  controller manager
+  template:
+    src: "{{ item.file }}"
+    dest: "{{ kube_config_dir }}/addons/karmada/controlplane/{{ item.file }}"
+  with_items:
+    - { name: karmada-controlplane, file: controller-manager.yaml, type: deployment }
+    - { name: karmada-controlplane, file: karmada-scheduler.yaml, type: deployment }
+    - { name: karmada-controlplane, file: karmada-webhook.yaml, type: deployment }
+  register: karmada_host_manifests
+  when: inventory_hostname == groups['karmada-controlplane'][0]
+
+- name: Start karmada scheduler webhook and karmada controller manager
+  shell: "{{ bin_dir }}/kubectl apply -f /etc/kubernetes/addons/karmada/controlplane/{{ item.item.file }}"  # noqa 301 306 303 305
+  ignore_errors: true
+  with_items: "{{ karmada_host_manifests.results }}"
+  when: inventory_hostname == groups['karmada-controlplane'][0]

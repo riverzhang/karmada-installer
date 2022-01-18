@@ -1,0 +1,14 @@
+---
+- name: Create kubernetes certificate directory
+  file:
+    name: "{{ item }}"
+    state: directory
+  with_items:
+  - /etc/karmada/pki
+
+- block:
+  - include_tasks: certs_stat.yml
+  - include_tasks: common.yml
+  when: inventory_hostname == groups['karmada-controlplane'][0]
+
+- include_tasks: distribute.yml

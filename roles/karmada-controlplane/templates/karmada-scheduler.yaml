@@ -1,0 +1,52 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: karmada-scheduler
+  namespace: karmada-system
+  labels:
+    app: karmada-scheduler
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: karmada-scheduler
+  template:
+    metadata:
+      labels:
+        app: karmada-scheduler
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/master
+                    operator: In
+                    values:
+                      - ""
+      serviceAccountName: karmada-scheduler
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+      containers:
+        - name: karmada-scheduler
+          image: swr.ap-southeast-1.myhuaweicloud.com/karmada/karmada-scheduler:{{ karmada_version }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/karmada-scheduler
+            - --kubeconfig=/etc/karmada/kubeconfig
+            - --bind-address=0.0.0.0
+            - --secure-port=10351
+            - --feature-gates=Failover=true
+            - --enable-scheduler-estimator=true
+            - --v=4
+          volumeMounts:
+            - name: kubeconfig
+              readOnly: true
+              mountPath: /etc/karmada/kubeconfig
+      volumes:
+        - hostPath:
+            path: /etc/karmada/kubeconfig
+            type: FileOrCreate
+          name: kubeconfig

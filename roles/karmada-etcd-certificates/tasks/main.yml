@@ -1,0 +1,19 @@
+---
+- name: On etcd node Create etcd directory
+  file:
+    name: /etc/karmada/pki/etcd
+    state: directory
+  when: inventory_hostname in groups['karmada-etcd']
+
+- name: On karmada controlplane node create etcd certificate directory
+  file:
+    name: /etc/karmada/pki/etcd
+    state: directory
+  when: inventory_hostname in groups['karmada-controlplane']
+
+- block:
+  - include_tasks: certs_stat.yml
+  - include_tasks: generate.yml
+  when: inventory_hostname == groups['karmada-etcd'][0]
+
+- include_tasks: distribute.yml

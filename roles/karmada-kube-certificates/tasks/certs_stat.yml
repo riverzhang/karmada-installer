@@ -1,0 +1,60 @@
+---
+- name: Read karmada-ca root certificate private key stat info
+  stat:
+    path: /etc/karmada/pki/ca.key
+  register: ca_key_stat
+
+- name: Read karmada-ca root certificate stat info
+  stat:
+    path: /etc/karmada/pki/ca.crt
+  register: ca_crt_stat
+
+- name: Read front-proxy-ca root certificate private key stat info
+  stat:
+    path: /etc/karmada/pki/front-proxy-ca.key
+  register: front_proxy_ca_key_stat
+
+- name: Read front-proxy-ca root certificate stat info
+  stat:
+    path: /etc/karmada/pki/front-proxy-ca.crt
+  register: front_proxy_ca_crt_stat
+
+- name: Read apiserver certificate private key stat info
+  stat:
+    path: /etc/karmada/pki/apiserver.key
+  register: apiserver_key_stat
+
+- name: Read apiserver-kubelet-client certificate private key stat info
+  stat:
+    path: /etc/karmada/pki/apiserver-kubelet-client.key
+  register: apiserver_kubelet_client_key_stat
+
+- name: Read front-proxy-client certificate private key stat info
+  stat:
+    path: /etc/karmada/pki/front-proxy-client.key
+  register: front_proxy_client_key_stat
+
+- name: Read kube-scheduler certificate private key stat info
+  stat:
+    path: /etc/karmada/pki/kube-scheduler.key
+  register: kube_scheduler_key_stat
+
+- name: Read sa certificate private key stat info
+  stat:
+    path: /etc/karmada/pki/sa.key
+  register: sa_key_stat
+
+- name: Read sa certificate public key stat info
+  stat:
+    path: /etc/karmada/pki/sa.pub
+  register: sa_pud_stat
+
+- name: Read admin certificate private key stat info
+  stat:
+    path: /etc/karmada/pki/admin.key
+  register: admin_key_stat
+
+- name: Read kubelet certificate private key stat info
+  stat:
+    path: /etc/karmada/pki/kubelet.key
+  register: kubelet_key_stat

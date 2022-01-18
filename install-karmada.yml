@@ -1,0 +1,18 @@
+---
+- hosts: karmada-controlplane
+  roles:
+    - { role: karmada-etcd-certificates }
+    - { role: karmada-kube-certificates }
+
+- hosts: karmada-etcd
+  gather_facts: false
+  roles:
+    - { role: karmada-etcd }
+
+- hosts: karmada-controlplane
+  roles:
+    - { role: karmada-controlplane }
+
+- hosts: karmada-member
+  roles:
+    - { role: karmada-member }

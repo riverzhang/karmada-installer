@@ -1,0 +1,76 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: karmada-webhook
+  namespace: karmada-system
+  labels:
+    app: karmada-webhook
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: karmada-webhook
+  template:
+    metadata:
+      labels:
+        app: karmada-webhook
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: node-role.kubernetes.io/master
+                    operator: In
+                    values:
+                      - ""
+      serviceAccountName: karmada-webhook
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+      containers:
+        - name: karmada-webhook
+          image: swr.ap-southeast-1.myhuaweicloud.com/karmada/karmada-webhook:{{ karmada_version }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/karmada-webhook
+            - --kubeconfig=/etc/karmada/kubeconfig
+            - --bind-address=0.0.0.0
+            - --secure-port=8443
+            - --cert-dir=/var/serving-cert
+            - --v=4
+          ports:
+            - containerPort: 8443
+          volumeMounts:
+            - name: kubeconfig
+              readOnly: true
+              mountPath: /etc/karmada/kubeconfig
+            - name: cert
+              mountPath: /var/serving-cert
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8443
+              scheme: HTTPS
+      volumes:
+        - hostPath:
+            path: /etc/karmada/kubeconfig
+            type: FileOrCreate
+          name: kubeconfig
+        - name: cert
+          secret:
+            secretName: webhook-cert
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: karmada-webhook
+  namespace: karmada-system
+spec:
+  selector:
+    app: karmada-webhook
+  ports:
+    - port: 443
+      targetPort: 8443

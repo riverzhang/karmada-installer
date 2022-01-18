@@ -1,0 +1,52 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: karmada-scheduler-estimator-{{ current_member_cluster_name }}
+  namespace: karmada-system
+  labels:
+    cluster: {{ current_member_cluster_name }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: karmada-scheduler-estimator-{{ current_member_cluster_name }}
+  template:
+    metadata:
+      labels:
+        app: karmada-scheduler-estimator-{{ current_member_cluster_name }}
+    spec:
+      tolerations:
+        - key: node-role.kubernetes.io/master
+          operator: Exists
+      containers:
+        - name: karmada-scheduler-estimator
+          image: swr.ap-southeast-1.myhuaweicloud.com/karmada/karmada-scheduler-estimator:{{ karmada_version }}
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/karmada-scheduler-estimator
+            - --kubeconfig=/etc/{{ current_member_cluster_name }}-kubeconfig
+            - --cluster-name={{ current_member_cluster_name }}
+          volumeMounts:
+            - name: member-kubeconfig
+              subPath: {{ current_member_cluster_name }}-kubeconfig
+              mountPath: /etc/{{ current_member_cluster_name }}-kubeconfig
+      volumes:
+        - name: member-kubeconfig
+          secret:
+            secretName: {{ current_member_cluster_name }}-kubeconfig
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: karmada-scheduler-estimator-{{ current_member_cluster_name }}
+  namespace: karmada-system
+  labels:
+    cluster: {{ current_member_cluster_name }}
+spec:
+  selector:
+    app: karmada-scheduler-estimator-{{ current_member_cluster_name }}
+  ports:
+    - protocol: TCP
+      port: 10352
+      targetPort: 10352
