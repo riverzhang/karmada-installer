@@ -1,0 +1,52 @@
+---
+- name: Create kubernetes directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: 0700
+  with_items:
+  - "{{ karmada_etcd_cert_dir }}"
+  - "{{ karmada_etcd_data_dir }}"
+  - "{{ local_release_dir }}"
+
+- name: Download etcd file
+  get_url:
+    validate_certs: no
+    url: "{{  etcd_download_url }}"
+    dest: "{{ local_release_dir }}/"
+    timeout: "{{ download_timeout_online }}"
+
+- name: Unarchive etcd file
+  unarchive:
+    src: "{{ local_release_dir }}/etcd-{{ etcd_version }}-linux-{{ architectures }}.tar.gz"
+    dest: "{{ local_release_dir }}/"
+    remote_src: yes
+
+- name: Copy etcd file
+  copy:
+    src: "{{ local_release_dir }}/etcd-{{ etcd_version }}-linux-{{ architectures }}/{{ item }}"  # noqa 206
+    dest: "{{ bin_dir }}/karmada-etcd"
+    remote_src: yes
+    mode: "0755"
+  with_items:
+  - etcd
+
+- name: Create systemd unit file
+  template: src=etcd.service.j2 dest=/etc/systemd/system/karmada-etcd.service
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: true
+
+- name: Restart etcd service
+  service:
+    name: karmada-etcd
+    state: restarted
+    enabled: yes
+
+- name: Wait etcd service to start
+  shell: "set -o pipefail && systemctl status karmada-etcd.service|grep Active"
+  register: etcd_status
+  until: '"running" in etcd_status.stdout'
+  retries: 8
+  delay: 8

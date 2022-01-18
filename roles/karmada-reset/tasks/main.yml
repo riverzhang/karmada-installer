@@ -1,0 +1,52 @@
+---
+- block:
+  - name: reset | remove files and dirs of 'karmada' nodes
+    file: name={{ item }} state=absent
+    with_items:
+    - "/etc/kubernetes/addons/karmada/controlplane/{{ karmada_version }}_crds"
+    when: inventory_hostname in groups['karmada-controlplane']
+
+  - name: reset | Uninstall karmamda of host cluster
+    shell: "{{ bin_dir }}/kubectl config use-context admin@cluster.local --kubeconfig=/root/.kube/config && cat /etc/kubernetes/addons/karmada/controlplane/* | {{ bin_dir }}/kubectl delete -f -"  # noqa 301 306 303 305
+    when: inventory_hostname == groups['karmada-controlplane'][0]
+    ignore_errors: true
+
+  - name: reset | remove files and dirs of 'karmada' nodes
+    file: name={{ item }} state=absent
+    with_items:
+    - "/etc/karmada/"
+    - "/etc/kubernetes/addons/karmada/"
+  when: inventory_hostname in groups['karmada-controlplane']
+
+- block:
+  - name: reset | Uninstall karmamda of member cluster
+    shell: "cat /etc/kubernetes/addons/karmada/agent/* | {{ bin_dir }}/kubectl delete -f -"  # noqa 301 306 303 305
+    when: 'current_sync_mode == "pull"'
+    ignore_errors: true
+
+  - name: reset | Uninstall karmamda-config secret of host cluster
+    shell: "{{ bin_dir }}/kubectl delete secret  karmada-kubeconfig -n karmada-system"  # noqa 301 306 303 305
+    ignore_errors: true
+
+  - name: reset | remove files and dirs of 'karmada' nodes
+    file: name={{ item }} state=absent
+    with_items:
+    - "/etc/karmada/"
+    - "/etc/kubernetes/addons/karmada/"
+  when: inventory_hostname in groups['karmada-member']
+
+- block:
+  - name: reset | Stop and disable etcd service
+    service:
+      name: karmada-etcd
+      state: stopped
+      enabled: no
+    ignore_errors: true
+
+  - name: reset | Remove files and dirs
+    file: name={{ item }} state=absent
+    with_items:
+    - "{{ karmada_etcd_data_dir }}"
+    - "/etc/systemd/system/karmada-etcd.service"
+    ignore_errors: true
+  when: inventory_hostname in groups['karmada-etcd']

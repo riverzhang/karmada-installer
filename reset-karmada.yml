@@ -1,0 +1,4 @@
+---
+- hosts: karmada-controlplane:karmada-member
+  roles:
+    - { role: karmada-reset }
